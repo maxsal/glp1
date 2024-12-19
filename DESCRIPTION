@@ -21,7 +21,8 @@ Imports:
   pak,
   comorbidity,
   ggplot2,
-  survRM2
+  survRM2,
+  data.table
 Depends: 
     R (>= 4.3)
 RoxygenNote: 7.3.2
