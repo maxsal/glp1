@@ -16,8 +16,8 @@ cci_score <- function(icd_data) {
   }
 
   # subset
-  icd10_data <- icd_data[tolower(vocabulary_id) %chin% c("icd10", "icd10cm"), ]
-  icd9_data  <- icd_data[tolower(vocabulary_id) %chin% c("icd9", "icd9cm"), ]
+  icd10_data <- icd_data[tolower(icd_data[["vocabulary_id"]]) %chin% c("icd10", "icd10cm"), ]
+  icd9_data  <- icd_data[tolower(icd_data[["vocabulary_id"]]) %chin% c("icd9", "icd9cm"), ]
 
   # get comorbidities
   results_icd10 <- comorbidity::comorbidity(icd10_data, id = "id", code = "code",
