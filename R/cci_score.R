@@ -45,5 +45,7 @@ cci_score <- function(icd_data) {
 
   cci_score <- comorbidity::score(res_merge, weights = "quan", assign0 = TRUE)
 
-  data.table::as.data.table(res_merge)[, cci_score := cci_score][]
+  res_merge$cci_score <- cci_score
+
+  data.table::as.data.table(res_merge)
 }
