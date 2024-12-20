@@ -39,7 +39,7 @@ cci_score <- function(icd_data) {
   }
 
   select_vars <- c("id", comorbid_names)
-  res_merge <- res_merge[, ..select_vars]
+  res_merge <- res_merge[, select_vars, with = FALSE]
   class(res_merge) <- c("comorbidity", "data.frame")
   attr(res_merge, "map") <- "charlson_icd10_quan"
 
