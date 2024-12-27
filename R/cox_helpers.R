@@ -1,12 +1,8 @@
 # functions --------------------------------------------------------------------
 #' Clean output from coxphf object
 #' @param x A `coxphf` object
-#' @return tibble reporting coefficient, se, HR (95% CI), and p-value
-#' @importFrom purrr reduce
-#' @importFrom tibble enframe
-#' @importFrom dplyr rename
-#' @importFrom dplyr full_join
-#' @importFrom dplyr mutate
+#' @return data.table reporting coefficient, se, HR (95% CI), and p-value
+#' @import data.table
 #' @export
 #' @examples
 #' \dontrun{
@@ -14,27 +10,29 @@
 #' clean_coxphf(coxphf_obj)
 #' }
 clean_coxphf <- function(x) {
-  purrr::reduce(list(
-    tibble::enframe(x$coefficients) |> dplyr::rename(est = value),
-    tibble::enframe(x$ci.lower) |> dplyr::rename(or_lo = value),
-    tibble::enframe(x$ci.upper) |> dplyr::rename(or_hi = value),
-    tibble::enframe(sqrt(diag(x$var))) |> dplyr::rename(se = value),
-    tibble::enframe(x$prob) |> dplyr::rename(p = value)
-  ), dplyr::full_join, by = "name") |>
-    dplyr::mutate(
-      or_est = exp(est),
-      model_func = "coxphf"
-    ) |>
-    dplyr::rename(term = name)
+  # Create a single data.table with all required components
+  tmp <- data.table::data.table(
+    term    = names(x$coefficients),
+    est     = x$coefficients,
+    or_lo   = x$ci.lower,
+    or_hi   = x$ci.upper,
+    se      = sqrt(diag(x$var)),
+    p       = x$prob
+  )
+
+  # Add derived columns
+  tmp[, `:=`(
+    or_est     = exp(est),
+    model_func = "coxphf"
+  )]
+
+  return(tmp[])
 }
 
 #' Clean output from coxph object
 #' @param x A `coxph` object
-#' @return tibble reporting coefficient, se, HR (95% CI), and p-value
-#' @importFrom tibble as_tibble
-#' @importFrom dplyr rename
-#' @importFrom dplyr select
-#' @importFrom dplyr mutate
+#' @return data.table reporting coefficient, se, HR (95% CI), and p-value
+#' @import data.table
 #' @export
 #' @examples
 #' \dontrun{
@@ -42,12 +40,18 @@ clean_coxphf <- function(x) {
 #' clean_coxph(coxph_obj)
 #' }
 clean_coxph <- function(x) {
-  base::summary(x)$coefficients |>
-    tibble::as_tibble(rownames = "name") |>
-    dplyr::select(name, est = coef, or = `exp(coef)`, se = `se(coef)`, p = `Pr(>|z|)`) |>
-    dplyr::mutate(or_lo = base::exp(est - stats::qnorm(0.975) * se), or_hi = base::exp(est + stats::qnorm(0.975) * se)) |>
-    dplyr::rename(term = name) |>
-    dplyr::mutate(model_func = "coxph")
+  tmp <- data.table::as.data.table(base::summary(x)$coefficients, keep.rownames = "term")
+  data.table::setnames(
+    tmp,
+    old = c("coef", "exp(coef)", "se(coef)", "Pr(>|z|)"),
+    new = c("est", "or", "se", "p")
+  )
+  tmp[, `:=`(
+    or_lo = exp(est - stats::qnorm(0.975) * se),
+    or_hi = exp(est + stats::qnorm(0.975) * se),
+    model_func = "coxph"
+  )]
+  return(tmp)
 }
 
 #' Clean output from coxph or coxphf object
@@ -65,9 +69,9 @@ clean_coxph <- function(x) {
 #' }
 clean_coxph_output <- function(x) {
   if ("coxphf" %in% base::class(x)) {
-    return(clean_coxphf(x))
+    return(glp1::clean_coxphf(x))
   } else if ("coxph" %in% base::class(x)) {
-    return(clean_coxph(x))
+    return(glp1::clean_coxph(x))
   } else {
     stop("Invalid object class")
   }
@@ -127,20 +131,14 @@ matching_patterns <- function(patterns, character_vector) {
 #' @param caliper Caliper width for matching
 #' @param match_std_mean_diff_threshold Standardized mean difference threshold; if std_mean_diff is greater than threshold, variable is included as a covariate in disease model in matched cohort
 #' @return A list object containing unadjusted unmatched Cox PH model (`unadjusted_unmatched`), unadjusted matched Cox PH model (unadjusted_matched), matching object (`match_obj`), adjusted matched Cox PH model (`adjusted_matched`), and a tibble summarizing coefficients from the models (`coef_sum`)
+#' @import data.table
 #' @importFrom survival coxph
 #' @importFrom coxphf coxphf
 #' @importFrom MatchIt matchit
 #' @importFrom MatchIt match.data
-#' @importFrom dplyr across
-#' @importFrom tidyselect where
-#' @importFrom dplyr mutate
-#' @importFrom tibble as_tibble
-#' @importFrom janitor clean_names
-#' @importFrom dplyr filter
-#' @importFrom dplyr pull
+#' @importFrom janitor make_clean_names
 #' @importFrom glp1 matching_patterns
 #' @importFrom glp1 make_cox_formula
-#' @importFrom dplyr  bind_rows
 #' @importFrom glp1 clean_coxph_output
 #' @export
 #' @examples
@@ -165,31 +163,44 @@ extract_cox <- function(
     cox_engine <- survival::coxph
   }
 
-  # matching
+  # Matching
   match_formula <- as.formula(paste0(exposure, " ~ ", paste0(covariates, collapse = " + ")))
-
   match_obj <- MatchIt::matchit(
     formula  = match_formula,
     data     = data,
     method   = "nearest",
     distance = "glm",
-    calpier  = caliper
+    caliper  = caliper
   )
-  matched <- MatchIt::match.data(match_obj) |>
-    dplyr::mutate(dplyr::across(tidyselect::where(is.factor), droplevels))
 
-  adj_vars <- summary(match_obj)$sum.matched |>
-    tibble::as_tibble(rownames = "term") |>
-    janitor::clean_names() |>
-    dplyr::filter(abs(std_mean_diff) > match_std_mean_diff_threshold) |>
-    dplyr::pull(term) |>
+  matched <- data.table::as.data.table(MatchIt::match.data(match_obj))
+  matched[, (names(matched)) := lapply(.SD, function(x) if (is.factor(x)) droplevels(x) else x)]
+
+  adj_vars <- data.table::as.data.table(summary(match_obj)$sum.matched, keep.rownames = "term")
+  data.table::setnames(adj_vars, old = names(adj_vars), new = janitor::make_clean_names(adj_vars))
+  adj_vars <- adj_vars[abs(std_mean_diff) > match_std_mean_diff_threshold, term] |>
     glp1::matching_patterns(patterns = c(exposure, covariates), character_vector = _)
-  not_adj_vars <- covariates[!covariates %in% adj_vars]
 
-  # cox model
-  f_un  <- glp1::make_cox_formula(time_var = time, status_var = outcome, x = exposure, covs = NULL, as_formula = TRUE)
-  f_adj <- glp1::make_cox_formula(time_var = time, status_var = outcome, x = exposure, covs = adj_vars, as_formula = TRUE)
+  not_adj_vars <- setdiff(covariates, adj_vars)
 
+  # Cox Model Formulas
+  f_un <- glp1::make_cox_formula(
+    time_var  = time,
+    status_var = outcome,
+    x          = exposure,
+    covs       = NULL,
+    as_formula = TRUE
+  )
+
+  f_adj <- glp1::make_cox_formula(
+    time_var  = time,
+    status_var = outcome,
+    x          = exposure,
+    covs       = adj_vars,
+    as_formula = TRUE
+  )
+
+  # Cox Models
   unadj_unmatched_cox <- cox_engine(
     formula = f_un,
     data    = data
@@ -202,45 +213,54 @@ extract_cox <- function(
 
   adj_cox <- cox_engine(
     formula = f_adj,
-    data = matched
+    data    = matched
   )
 
-  coef_sum <- dplyr::bind_rows(
-    glp1::clean_coxph_output(unadj_unmatched_cox) |>
-      dplyr::mutate(
-        model                   = "Unmatched",
-        adjusted                = "No",
-        adjust_vars             = "None",
-        not_adjust_vars         = NA_character_,
-        match_vars              = "None",
-        std_mean_diff_threshold = NA_real_
+  # Coefficient Summary
+  coef_sum <- data.table::rbindlist(
+    list(
+      cbind(
+        glp1::clean_coxph_output(unadj_unmatched_cox),
+        data.table::data.table(
+          model                   = "Unmatched",
+          adjusted                = "No",
+          adjust_vars             = "None",
+          not_adjust_vars         = NA_character_,
+          match_vars              = "None",
+          std_mean_diff_threshold = NA_real_
+        )
       ),
-    glp1::clean_coxph_output(unadj_matched_cox) |>
-      dplyr::mutate(
-        model                   = "Matched",
-        adjusted                = "No",
-        adjust_vars             = "None",
-        not_adjust_vars         = NA_character_,
-        match_vars              = paste0(covariates, collapse = ", "),
-        std_mean_diff_threshold = NA_real_
+      cbind(
+        glp1::clean_coxph_output(unadj_matched_cox),
+        data.table::data.table(
+          model                   = "Matched",
+          adjusted                = "No",
+          adjust_vars             = "None",
+          not_adjust_vars         = NA_character_,
+          match_vars              = paste0(covariates, collapse = ", "),
+          std_mean_diff_threshold = NA_real_
+        )
       ),
-    glp1::clean_coxph_output(adj_cox) |>
-      dplyr::mutate(
-        model                   = "Matched",
-        adjusted                = "Yes",
-        adjust_vars             = paste0(adj_vars, collapse = ", "),
-        not_adjust_vars         = paste0(not_adj_vars, collapse = ", "),
-        match_vars              = paste0(covariates, collapse = ", "),
-        std_mean_diff_threshold = match_std_mean_diff_threshold
+      cbind(
+        glp1::clean_coxph_output(adj_cox),
+        data.table::data.table(
+          model                   = "Matched",
+          adjusted                = "Yes",
+          adjust_vars             = paste0(adj_vars, collapse = ", "),
+          not_adjust_vars         = paste0(not_adj_vars, collapse = ", "),
+          match_vars              = paste0(covariates, collapse = ", "),
+          std_mean_diff_threshold = match_std_mean_diff_threshold
+        )
       )
+    )
   )
 
-  list(
+  # Return Results
+  return(list(
     unadjusted_unmatched = unadj_unmatched_cox,
     unadjusted_matched   = unadj_matched_cox,
     match_obj            = match_obj,
     adjusted_matched     = adj_cox,
     coef_sum             = coef_sum
-  )
-
+  ))
 }

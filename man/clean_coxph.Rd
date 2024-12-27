@@ -10,7 +10,7 @@ clean_coxph(x)
 \item{x}{A `coxph` object}
 }
 \value{
-tibble reporting coefficient, se, HR (95% CI), and p-value
+data.table reporting coefficient, se, HR (95% CI), and p-value
 }
 \description{
 Clean output from coxph object

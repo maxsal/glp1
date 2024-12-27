@@ -197,7 +197,7 @@ rmst_single_arm <- function(
 #' @param .tau time point at which to assess restricted mean survival time
 #' @return tibble reporting coefficient, se, HR (95% CI), and p-value
 #' @import ggplot2
-#' @import dplyr
+#' @import data.table
 #' @export
 #' @examples
 #' \dontrun{
@@ -224,10 +224,10 @@ rmst_plot <- function(x, trt_var = "glp1", tte_var = "time", event_var = "outcom
       (\(y) y[[event_var]])(),
     tau = .tau
   )
-  dplyr::bind_rows(
-    unexposed |> dplyr::select(rmst, lo = lcl, hi = ucl, event) |> dplyr::mutate(exposure = "Unexposed"),
-    exposed |> dplyr::select(rmst, lo = lcl, hi = ucl, event) |> dplyr::mutate(exposure = "Exposed")
-  ) |>
+  data.table::rbindlist(list(
+    data.table::as.data.table(unexposed)[, .(rmst, lo = lcl, hi = ucl, event, exposure = "Unexposed")],
+    data.table::as.data.table(exposed)[, .(rmst, lo = lcl, hi = ucl, event, exposure = "Exposed")]
+  )) |>
     ggplot2::ggplot(ggplot2::aes(x = exposure, y = rmst)) +
     ggplot2::geom_pointrange(ggplot2::aes(ymin = lo, ymax = hi)) +
     ggplot2::labs(
@@ -252,10 +252,8 @@ rmst_plot <- function(x, trt_var = "glp1", tte_var = "time", event_var = "outcom
 #' @param taus vector of time points at which to assess restricted mean survival time, assumes years
 #' @return tibble reporting coefficient, se, HR (95% CI), and p-value
 #' @import ggplot2
-#' @import dplyr
+#' @import data.table
 #' @importFrom survRM2 rmst2
-#' @importFrom tibble as_tibble
-#' @importFrom purrr map_dfr
 #' @export
 #' @examples
 #' \dontrun{
@@ -269,14 +267,24 @@ rmst_diff_plot <- function(
     trt_var     = "glp1",
     taus        = 1:5
 ) {
-  tmp <- purrr::map_dfr(
-    taus,
-    \(i) {
-      survRM2::rmst2(matched_data[[time_var]], matched_data[[outcome_var]], matched_data[[trt_var]], tau=i*365)$unadjusted.result |>
-        tibble::as_tibble(rownames = "metric") |>
-        dplyr::filter(metric == "RMST (arm=1)-(arm=0)") |>
-        dplyr::mutate(time = i)
-    })
+
+  tmp <- data.table::rbindlist(
+    lapply(
+      taus,
+      function(i) {
+        res <- survRM2::rmst2(
+          matched_data[[time_var]],
+          matched_data[[outcome_var]],
+          matched_data[[trt_var]],
+          tau = i * 365
+        )$unadjusted.result
+
+        data.table::as.data.table(res, keep.rownames = "metric")[metric == "RMST (arm=1)-(arm=0)"][
+          , time := i
+        ]
+      }
+    )
+  )
 
   return(
     list(

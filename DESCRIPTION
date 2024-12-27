@@ -11,12 +11,8 @@ LazyData: true
 Imports:
   MatchIt,
   coxphf,
-  dplyr,
   janitor,
-  purrr,
   survival,
-  tibble,
-  tidyselect,
   cli,
   pak,
   comorbidity,
