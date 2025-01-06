@@ -277,11 +277,10 @@ rmst_diff_plot <- function(
           matched_data[[outcome_var]],
           matched_data[[trt_var]],
           tau = i * 365
-        )$unadjusted.result
-        res <- data.table::as.data.table(res, keep.rownames = "metric")
-        data.table::setDT(res)
+        )$unadjusted.result |>
+          data.table::as.data.table()
 
-        res[metric == "RMST (arm=1)-(arm=0)", ][
+        res[res[[1]] == "RMST (arm=1)-(arm=0)", ][
           , time := i
         ][]
       }
