@@ -279,7 +279,8 @@ rmst_diff_plot <- function(
           tau = i * 365
         )$unadjusted.result |>
           data.table::as.data.table(keep.rownames = TRUE) |>
-          (\(x) x[x[[1]] == "RMST (arm=1)-(arm=0)", ])()
+          data.table::setDT()
+        res <- res[res[[1]] == "RMST (arm=1)-(arm=0)", ]
         data.table::set(res, j = "time", value = i)
         res[]
       }
