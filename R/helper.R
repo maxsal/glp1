@@ -278,7 +278,7 @@ rmst_diff_plot <- function(
           matched_data[[trt_var]],
           tau = i * 365
         )$unadjusted.result |>
-          data.table::as.data.table()
+          data.table::as.data.table(keep.rownames = TRUE)
 
         res[res[[1]] == "RMST (arm=1)-(arm=0)", ][
           , time := i
