@@ -249,7 +249,7 @@ rmst_plot <- function(x, trt_var = "glp1", tte_var = "time", event_var = "outcom
 #' @param trt_var character name of the treatment indicator variable
 #' @param time_var character name of the time-to-event variable, assumes days
 #' @param outcome_var character name of the outcome (event) indicator variable
-#' @param taus vector of time points at which to assess restricted mean survival time, assumes years
+#' @param .taus vector of time points at which to assess restricted mean survival time, assumes years
 #' @return tibble reporting coefficient, se, HR (95% CI), and p-value
 #' @import ggplot2
 #' @import data.table
@@ -265,12 +265,12 @@ rmst_diff_plot <- function(
     time_var    = "time",
     outcome_var = "outcome",
     trt_var     = "glp1",
-    taus        = 1:5
+    .taus        = 1:5
 ) {
 
   tmp <- data.table::rbindlist(
     lapply(
-      taus,
+      .taus,
       function(i) {
         res <- survRM2::rmst2(
           matched_data[[time_var]],
@@ -283,7 +283,7 @@ rmst_diff_plot <- function(
 
         res[metric == "RMST (arm=1)-(arm=0)"][
           , time := i
-        ]
+        ][]
       }
     )
   )

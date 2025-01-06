@@ -9,7 +9,7 @@ rmst_diff_plot(
   time_var = "time",
   outcome_var = "outcome",
   trt_var = "glp1",
-  taus = 1:5
+  .taus = 1:5
 )
 }
 \arguments{
@@ -21,7 +21,7 @@ rmst_diff_plot(
 
 \item{trt_var}{character name of the treatment indicator variable}
 
-\item{taus}{vector of time points at which to assess restricted mean survival time, assumes years}
+\item{.taus}{vector of time points at which to assess restricted mean survival time, assumes years}
 }
 \value{
 tibble reporting coefficient, se, HR (95% CI), and p-value
