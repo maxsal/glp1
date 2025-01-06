@@ -281,7 +281,7 @@ rmst_diff_plot <- function(
         res <- data.table::as.data.table(res, keep.rownames = "metric")
         data.table::setDT(res)
 
-        res[metric == "RMST (arm=1)-(arm=0)", ][
+        res[metric == "RMST (arm=1)-(arm=0)"][
           , time := i
         ][]
       }
