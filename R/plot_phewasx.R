@@ -46,7 +46,7 @@ plot_phewasx <- function(
     label_size           = 3
 ) {
   # initialize
-  pheinfox <- data.table::copy(glp1::pheinfox)
+  pheinfox <- data.table::copy(data.table::as.data.table(glp1::pheinfox))
 
   # prep
   if (!data.table::is.data.table(data)) data <- data.table::as.data.table(data)
