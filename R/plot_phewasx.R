@@ -45,21 +45,20 @@ plot_phewasx <- function(
     color_dot_symbol     = "\u25CF",
     label_size           = 3
 ) {
-  # initialize
-  pheinfox <- data.table::copy(data.table::as.data.table(glp1::pheinfox))
-
   # prep
   if (!data.table::is.data.table(data)) data <- data.table::as.data.table(data)
   data2 <- data.table::copy(data.table::as.data.table(data))
+
   if (beta_var %in% names(data2)) {
     phewas <- data2[, direction := data.table::fifelse(get(beta_var) > 0, "Positive", "Negative")]
   } else {
     phewas <- data2[, direction := "None"]
   }
+  if (!data.table::is.data.table(phewas)) phewas <- data.table::as.data.table(phewas)
 
   plot_data <- data.table::merge.data.table(
     phewas,
-    pheinfox[, .(
+    glp1::pheinfox[, .(
       phecode,
       group,
       groupnum,
@@ -86,7 +85,7 @@ plot_phewasx <- function(
 
   vars              <- c("group", color_var)
   plot_data_mean    <- plot_data[, .(mean = mean(order, na.rm = TRUE)), by = group]
-  plot_data_mean    <- data.table::merge.data.table(plot_data_mean, unique(pheinfox[, ..vars]), by = "group")
+  plot_data_mean    <- data.table::merge.data.table(plot_data_mean, unique(glp1::pheinfox[, ..vars]), by = "group")
   phe_colors        <- plot_data_mean[[color_var]]
   names(phe_colors) <- plot_data_mean[, group]
 
