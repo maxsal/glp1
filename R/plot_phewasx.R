@@ -69,6 +69,7 @@ plot_phewasx <- function(
     by.x = phe_var,
     by.y = "phecode"
   )[order(order), ]
+  if (!data.table::is.data.table(plot_data)) plot_data <- data.table::as.data.table(plot_data)
 
   # reset ordering, if requested
   if (order_reset) {
