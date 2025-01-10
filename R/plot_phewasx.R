@@ -50,7 +50,7 @@ plot_phewasx <- function(
 
   # prep
   if (!data.table::is.data.table(data)) data <- data.table::as.data.table(data)
-  data2 <- data.table::copy(data)
+  data2 <- data.table::copy(data.table::as.data.table(data))
   if (beta_var %in% names(data2)) {
     phewas <- data2[, direction := data.table::fifelse(get(beta_var) > 0, "Positive", "Negative")]
   } else {
